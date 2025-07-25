@@ -1,0 +1,3 @@
+* text=auto
+*.xyz text eol=lf
+*.gro text eol=lf
