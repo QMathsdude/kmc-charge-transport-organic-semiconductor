@@ -8,4 +8,4 @@ Python dependencies for this project are listed in the `environment.yml` file. T
 
 - Within the directory with `environment.yml` file, enter the command `conda env create --file environment.yml`.
 - Check whether the new environment is created by the command `conda env list`.
-- Activate the environment by `conda activate kmc_charge_transport`.
+- Activate the environment by `conda activate kmc`.
