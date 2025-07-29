@@ -1,5 +1,6 @@
 # Operating System Files
 .DS_Store             # macOS system files
+**/.DS_Store
 .localized            # macOS localization files
 desktop.ini           # Windows configuration files
 Thumbs.db             # Windows thumbnail cache
