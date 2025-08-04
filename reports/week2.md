@@ -180,7 +180,7 @@ We have a first attempt in finding an algorithm to find where molecules block ea
 4. Lastly, we use a for loop to iterate over all blocks to find which nodes have been blocked, to do this, we used the `np.where` function which only selects data given a certain condition. The condition given is as follows:
 
 $$
-[(\theta_{1} < \theta < \theta_{2})\ | \ (\theta_1 <\theta +2\pi < \theta_2 )] \ \& \ (d_{\text{node}} > d_{\text{current node}}) 
+[(\theta_{1} < \theta < \theta_{2})\ \lor \ (\theta_1 <\theta +2\pi < \theta_2 )] \ \land \ (d_{\text{node}} > d_{\text{current node}}) 
 $$
 
 
