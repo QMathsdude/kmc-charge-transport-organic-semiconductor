@@ -103,7 +103,6 @@ Before tackling 3-D case, we consider 2-D case as it is much simpler.
 
 - However, there is a bug in this implementation that must be taken into account. It is shown in the figure below.
 - This problem was solved by simply checking if $\varphi_{v_1 \,\text{max}} < \varphi_{v_1 \,\text{min}}$, then if `True` adding $2\pi$ to $\varphi_{v_1\,\text{max}}$. Finally, adding another check whether $\varphi_{v_1\,\text{min}}\leq\varphi_{v_i}+2\pi\leq\varphi_{v_2\,\text{max}}$.
-- Unfortunately, for now am **unable** to think of a solution to this problem. So it remains in this version of code.
 
 <p align="center">
     <img src="../reports/images/03_method_2_error_2D.png" style="width: 300px; height: 300px;">
@@ -216,6 +215,7 @@ Take note that 3-D case has a code error that is difficult has not been fixed.
 - For example, in the diagram below, the node is at $\theta\approx 10\degree$. But we can clearly see that the square area encompasses $0\degree\leq\varphi<360\degree$.
 - However, the value of $\varphi_{v\,\text{min}}=270\degree$ while $\varphi_{v\,\text{max}}=450\degree$. This is a difference of only $180\degree$ which is the cause of this issue.
 - The diagram below shows the node being in $0\degree\leq\varphi\leq180\degree,$ and therefore **an edge is drawn between them** **despite being blocked**.
+- Unfortunately, for now am **unable** to think of a solution to this problem. So it remains in this version of code.
 
 <p align="center">
     <img src="../reports/images/03_method_2_error_3D.png" style="width: 400px; height: 300px;">
