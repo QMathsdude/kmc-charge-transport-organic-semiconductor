@@ -45,7 +45,7 @@ print("Hello dunia")
 
 Overall, since the *total number of edges* obtained in both Method 1 and Method 2 are *similar*, we can say that these two methods were a success.
 
-Although, it cannot be ignored that the *total number of edges* obtained by Method 2 is in-fact **greater** than *Method 1*. This is likely due to the code error mentioned in the [3-D Section](#️-code-error) below. 
+Although, it cannot be ignored that the *total number of edges* obtained by Method 2 is in-fact **greater** than *Method 1*. This is likely due to the code error mentioned in the [3-D Section](#warning-blocking-model-bug-1) below. 
 
 Actually, Method 2 was initially considered as a *'guaranteed'* method of obtaining an accurate *total number of edges*, and thus used to measure the effectiveness of Method 1. However, taking into account the *extra edges* produced by Method 2 due to coding error, we hypothesize that **Method 1** is the **more accurate** and **reliable** model.
 
@@ -58,10 +58,10 @@ Average number of edges per node: 10.21
 
 Neighbors of Node 1: [('1.3', '0.6675', '10.66'), ('2.188', '0.223', '11'), ('1.774', '0.28', '10.28')]
 ```
-
-<div style="text-align: center;">
-  <img src="../reports/images/03_method_2_network_of_molecules_3D.png" style="max-width: 80%; height: auto;">
-</div>
+<p align="center">
+    <img src="../reports/images/03_method_2_network_of_molecules_3D.png" style="width: 500px; height: 500px;">
+</p>
+<p align="center">Illustration of 3-D network of molecules with blocking</p>
 
 ---
 
@@ -76,71 +76,57 @@ Before tackling 3-D case, we consider 2-D case as it is much simpler.
     1. $v_2$ lies further away from $v_1;$ $(r_{v_2}>r_{v_3})$
     2. $v_2$ lies within the wingspan of $v_1;$ $(\varphi_{v_1\, \text{min}}\leq\varphi_{v_2}\leq\varphi_{v_1\, \text{max}}).$
 
-<div style="text-align: center;">
-  <figure>
-    <img src="../reports/images/03_method_2_explanation_2D.png" style="max-width: 70%; height: auto;">
-    <figcaption style="font-style: italic; margin-top: 5px;">
-      Illustration of node 2 being blocked by node 1, from the reference frame of selected node
-    </figcaption>
-  </figure>
-</div>
+<p align="center">
+    <img src="../reports/images/03_method_2_explanation_2D.png" style="width: 300px; height: 300px;">
+</p>
+<p align="center">Illustration of node 2 being blocked by node 1, from the reference frame of selected node</p>
 
 - Therefore, the idea is to loop through every single node $v_i$ and determine from that node's reference frame, which neighboring nodes are blocked. 
 - Once the loop has ended, we successfully obtained all possible neighbors for every individual node $v_i$ as shown in the figure below.
 
-<div style="text-align: center;">
-  <figure>
-    <img src="../reports/images/02_graph_network_with_unblocked_edges.png" style="max-width: 70%; height: auto;">
-    <figcaption style="font-style: italic; margin-top: 5px;">
-      Successful 2D network graph
-    </figcaption>
-  </figure>
-</div>
-
+<p align="center">
+    <img src="../reports/images/02_graph_network_with_unblocked_edges.png" style="width: 400px; height: 400px;">
+</p>
+<p align="center">Successful 2D network graph</p>
 
 #### :lock: Blocking Model
 - Assume that every node $v$ has wingspan $d\ell$.
 - Value $d\ell$ was pre-calculated and found to be $1.6\mathrm{nm}.$
 - Each node $v$ *sees the full wingspan* of neighboring nodes as the figure below. (in other words, every node is effectively a 'spherical' molecule)
 
-<div style="text-align: center;">
-  <figure>
-    <img src="../reports/images/02_illustration_of_wingspan.png" style="max-width: 70%; height: auto;">
-    <figcaption style="font-style: italic; margin-top: 5px;">
-      Successful implementation of blocking model on a single node
-    </figcaption>
-  </figure>
-</div>
+<p align="center">
+    <img src="../reports/images/02_illustration_of_wingspan.png" style="width: 400px; height: 400px;">
+</p>
+<p align="center">Successful implementation of blocking model on a single node</p>
+
+#### :warning: Blocking model bug
 
 - However, there is a bug in this implementation that must be taken into account. It is shown in the figure below.
 - This problem was solved by simply checking if $\varphi_{v_1 \,\text{max}} < \varphi_{v_1 \,\text{min}}$, then if `True` adding $2\pi$ to $\varphi_{v_1\,\text{max}}$. Finally, adding another check whether $\varphi_{v_1\,\text{min}}\leq\varphi_{v_i}+2\pi\leq\varphi_{v_2\,\text{max}}$.
+- Unfortunately, for now am **unable** to think of a solution to this problem. So it remains in this version of code.
 
-<div style="text-align: center;">
-  <figure>
-    <img src="../reports/images/03_method_2_error_2D.png" style="max-width: 70%; height: auto;">
-    <figcaption style="font-style: italic; margin-top: 5px;">
-      Bug in angle implementation
-    </figcaption>
-  </figure>
-</div>
+<p align="center">
+    <img src="../reports/images/03_method_2_error_2D.png" style="width: 300px; height: 300px;">
+</p>
+<p align="center">Bug in angle implementation</p>
 
 
 #### :space_invader: Code
 
 In order to reduce computation time, **numpy vectorised calculations** were used. In simple terms, if two numpy arrays $A$ and $B$ both contains 100 elements, and an operation is carried out between them such as `+`, `-`, `*` or `/`, **all elements are evaluated in parallel** (at the same time). This is much quicker compared Python's slower `for` loops. Furthermore, [boolean masking](https://how.dev/answers/what-is-boolean-masking-on-numpy-arrays-in-python) is also used to speed up checking.
 
-##### Variables :
+**Variables:**
 - `distances` — numpy array storing $r_v$ for all neighboring nodes, **with respect** to selected node $v_i$.
 - `phis` — numpy array storing angles $\varphi$ of all neighboring nodes, **with respect** to selected node $v_i$.
 - `block1_phis` — numpy array storing $\varphi_{v\,\text{min}}$ for all neighboring nodes, **with respect** to selected node $v_i$.
 - `block2_phis` — numpy array storing $\varphi_{v\,\text{max}}$ for all neighboring nodes, **with respect** to selected node $v_i$.
 - `nodes_neighbors = []` — list that stores all neighboring nodes to a selected node $v_i$.
 
-##### Pre-Processing: 
+**Pre-Processing:**
 - Initially, for each selected node $v_i$, all of it's neighbors distances $d$ with respect to it, are **sorted ascending order** (closest to furthest). These values are stored in `distances`.
 - The same arrangement is used on `phis`, `block1_phis` and `block2_phis` so that they are all **consistent** with each other. (i.e. closest to furthest)
 
-##### Blocking algorithm:
+**Blocking algorithm:**
 
 - First, this algorithm loops through **every single neighboring node's wingspan**, that is `block1_phis[i]` and `block2_phis[i]`. For example, let's say we are currently checking the first neighbor node, $v_1$.
 - Second, it checks whether any `phis` (angle of neighbor nodes with respect to selected node $v_i$) are **blocked by** $\varphi_{v_1\,\text{min}}$ and $\varphi_{v_1\,\text{max}}$.
@@ -194,7 +180,6 @@ except IndexError:
     pass
 ```
 
-
 ---
 
 ### **Three-Dimensions**
@@ -208,14 +193,10 @@ Take note that 3-D case has a code error that is difficult has not been fixed.
     2. $v_2$ lies within the azimuthal wingspan of $v_1;$ $(\varphi_{v_1\, \text{min}}\leq\varphi_{v_2}\leq\varphi_{v_1\, \text{max}})$
     3. $v_2$ lies within the zenith wingspan of $v_1;$ $(\theta_{v_1\, \text{min}}\leq\theta_{v_2}\leq\theta_{v_1\, \text{max}})$
 
-<div style="text-align: center;">
-  <figure>
-    <img src="../reports/images/03_method_2_explanation_3D.png" style="max-width: 70%; height: auto;">
-    <figcaption style="font-style: italic; margin-top: 5px;">
-      Illustration of the blocking surface of node 1
-    </figcaption>
-  </figure>
-</div>
+<p align="center">
+    <img src="../reports/images/03_method_2_explanation_3D.png" style="width: 300px; height: 300px;">
+</p>  
+<p align="center">Illustration of the blocking surface of node 1</p>
 
 - The idea is the same as discussed in the 2-D case.
 
@@ -224,14 +205,10 @@ Take note that 3-D case has a code error that is difficult has not been fixed.
 - Value $d\ell$ was pre-calculated and found to be $1.6\mathrm{nm}.$
 - Each node $v$ *sees a square area* $(d\ell\times d\ell)$ as shown the figure below. (in other words, every node is effectively a 'cube' molecule)
 
-<div style="text-align: center;">
-  <figure>
-    <img src="../reports/images/03_illustration_of_area.png" style="max-width: 100%; height: auto;">
-    <figcaption style="font-style: italic; margin-top: 5px;">
-      Semi-successful implementation of blocking model on a single node
-    </figcaption>
-  </figure>
-</div>
+<p align="center">
+    <img src="../reports/images/03_illustration_of_area.png" style="width: 400px; height: 300px;">
+</p>  
+<p align="center">Semi-successful implementation of blocking model on a single node</p>
 
 #### :warning: Blocking model bug
 - At angles nearing $\theta\to0\degree$ and $\theta\to180\degree$, a bug as shown in the diagram below will occur.
@@ -240,14 +217,10 @@ Take note that 3-D case has a code error that is difficult has not been fixed.
 - However, the value of $\varphi_{v\,\text{min}}=270\degree$ while $\varphi_{v\,\text{max}}=450\degree$. This is a difference of only $180\degree$ which is the cause of this issue.
 - The diagram below shows the node being in $0\degree\leq\varphi\leq180\degree,$ and therefore **an edge is drawn between them** **despite being blocked**.
 
-<div style="text-align: center;">
-  <figure>
-    <img src="../reports/images/03_method_2_error_3D.png" style="max-width: 100%; height: auto;">
-    <figcaption style="font-style: italic; margin-top: 5px;">
-      Bug in 3-D  blocking model
-    </figcaption>
-  </figure>
-</div>
+<p align="center">
+    <img src="../reports/images/03_method_2_error_3D.png" style="width: 400px; height: 300px;">
+</p>
+<p align="center">Bug in 3-D  blocking model</p>
 
 #### :space_invader: Code
 
@@ -286,4 +259,3 @@ except IndexError:
     # Fix problem: all_blocked_indices is empty ndarray
     pass
 ```
-
