@@ -1,25 +1,76 @@
+###############################
 # Operating System Files
-.DS_Store             # macOS system files
+###############################
+
+# 1. macOS system files
+.DS_Store
 **/.DS_Store
-.localized            # macOS localization files
-desktop.ini           # Windows configuration files
-Thumbs.db             # Windows thumbnail cache
+# 2. macOS localization files
+.localized
+# 3. Windows configuration files
+desktop.ini
+# 4. Windows thumbnail cache
+Thumbs.db
 
-# Jupyter Notebook Files
-.ipynb_checkpoints/   # Jupyter auto-generated checkpoints
-*.ipynb_checkpoints   # Backup files created by Jupyter
-.ipynb_vendored/      # Jupyter vendored extensions
-.jupyter/             # Jupyter configuration directory (if not shared)
 
+###############################
 # Conda/Python Environment Files
-*.pyc                 # Python compiled files
-__pycache__/          # Python 3 bytecode cache
-venv/                 # Virtual environment folder (if you use venv alongside conda)
-env/                  # Another common name for virtual environment folder
-.conda/               # Conda specific files (rarely needed to track)
-.condarc              # Conda configuration file (usually user-specific)
+###############################
 
+# 1. Python3 compiled bytecode
+__pycache__/
+# 2. Virtual environment folder (if you use venv alongside conda)
+venv/
+# 3. Another common name for virtual environment folder
+env/
+# 4. Conda specific files (rarely needed to track)
+.conda/
+# 5. Conda configuration file (usually user-specific)
+.condarc
+
+
+###############################
+# Jupyter Notebook Files
+###############################
+
+# 1. Jupyter auto-generated checkpoints
+.ipynb_checkpoints/
+# 2. Backup files created by Jupyter
+*.ipynb_checkpoints
+# 3. Jupyter vendored extensions
+.ipynb_vendored/
+# 4. Jupyter configuration directory (if not shared)
+.jupyter/
+
+
+###############################
+# IDE and Editor Files
+###############################
+# 1. Visual Studio Code settings
+.vscode/
+# 2. IntelliJ/PyCharm settings
+.idea/
+# 3. Vim swap files
+*.swp
+# 4. Emacs backup files
+*~
+
+
+###############################
+# Miscellaneous
+###############################
+# 1. Log files
+*.log
+# 2. Backup files
+*.bak
+# 3. Temporary files
+*.tmp
+
+
+###############################
 # Data Files (Important: Only ignore processed/derived data, NOT raw data you want to track)
+###############################
+
 # Consider ignoring large output files or intermediate data that can be regenerated.
 # For example, if your notebooks generate large CSVs or plots:
 # output/             # Folder for generated output files
@@ -28,14 +79,3 @@ env/                  # Another common name for virtual environment folder
 # *.zip
 # *.tar.gz
 # *.pkl               # Python pickle files (often large and not suitable for version control)
-
-# IDE and Editor Files
-.vscode/              # Visual Studio Code settings
-.idea/                # IntelliJ/PyCharm settings
-*.swp                 # Vim swap files
-*~                    # Emacs backup files
-
-# Miscellaneous
-*.log                 # Log files
-*.bak                 # Backup files
-*.tmp                 # Temporary files
