@@ -1,8 +1,43 @@
+"""
+This module provides functions for dividing the unit cell into subboxes, which
+could be used to reduce computation time by reducing the amount of molecules considered
+when finding nearest neighbours of a molecule.
+
+Main Functions:
+- subbox_division():    Divides the unit cell into subboxes and outputs a DataFrame with all 
+                        subboxes and their respective adjacent subbox with the molecules in 
+                        each subbox.
+- flatten_subboxes():   (Optional)Used to reduce the subbox DataFrame into a DataFrame with 
+                        all the residue ID that are "nearby" to each other for every subbox
+
+Dependencies:
+- pandas >= 1.3.0
+- numpy >= 1.21.0
+"""
+
 #imports
 import numpy as np
 import pandas as pd
 
+__all__ = ['subbox_division', 'flatten_subboxes']
+
+# -----------------------------
+
+# Function to divide subbox
 def subbox_division(number_of_subboxes, box_dimensions, midpoints_df):
+    """
+    Reads a GROMACS .gro file and extracts atomic coordinates.
+
+    Args:
+        number_of_subboxes (int):       The number of subboxes needed.
+        box_dimensions (list):          A list with dimensions of the unit cell
+        midpoints_df (pd.DataFrame):    Dataframe containing midpoints of each molcule 
+                                        with their respective residue ID
+
+    Returns:
+        pd.DataFrame:   A DataFrame containing each subbox with their respective adjacent 
+                        subboxes and the residue ID in each subbox.
+    """
     subboxes_dimensions = [x / number_of_subboxes ** (1 / 3) for x in box_dimensions] #get subbox dimensions and put into a list
 
 
@@ -87,10 +122,24 @@ def subbox_division(number_of_subboxes, box_dimensions, midpoints_df):
             edges_index.append((selected_box_str,adjacent_box_str))
 
     subboxes = pd.DataFrame(data = {'res_id': edges_res_id}, index = pd.MultiIndex.from_tuples(edges_index, names=['select_index', 'adjacent_index']))
-    # subboxes.to_csv(path_or_buf="put path here")
     return subboxes
 
+# -----------------------------
+
+# Function to group molecules that are nearby
 def flatten_subboxes(subboxes):
+    """
+    (Optional)Used to reduce the subbox DataFrame into a DataFrame with 
+    all the residue ID that are "nearby" to each other for every subbox
+
+    Args:
+        subboxes (pd.DataFrame):    Dataframe containing adjacent subboxes of a given subbox 
+                                    with their respective residue ID in each subbox
+
+    Returns:
+        pd.DataFrame:   A DataFrame with all the residue ID that are "nearby" to each other 
+                        for every subbox
+    """
     # Group edges_df by 'select_index' and aggregate all res_id lists from nearby indices
     def flatten(lists):
         return [item for sublist in lists for item in sublist]
@@ -103,3 +152,9 @@ def flatten_subboxes(subboxes):
     )
 
     return nearby_resid_df
+
+# -----------------------------
+
+# Check from CLI
+if __name__ == "__main__":
+    print("Running subbox_division.py as a script")
