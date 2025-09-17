@@ -1,21 +1,25 @@
 ###############################
 # Operating System Files
-###############################
-
-# 1. macOS system files
-.DS_Store
+.DS_Store             
 **/.DS_Store
-# 2. macOS localization files
 .localized
-# 3. Windows configuration files
 desktop.ini
-# 4. Windows thumbnail cache
 Thumbs.db
 
+# Jupyter Notebook Files
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+.ipynb_vendored/
+.jupyter/
 
 ###############################
 # Conda/Python Environment Files
-###############################
+*.pyc
+__pycache__/          
+venv/                
+env/                 
+.conda/               
+.condarc              
 
 # 1. Python3 compiled bytecode
 __pycache__/
@@ -79,3 +83,20 @@ env/
 # *.zip
 # *.tar.gz
 # *.pkl               # Python pickle files (often large and not suitable for version control)
+*.mp4
+*.gif
+*.
+
+# IDE and Editor Files
+.vscode/              
+.idea/                
+*.swp                 
+*.code-workspace                
+
+# Miscellaneous
+*.log                 
+*.bak                 
+*.tmp                 
+
+# Output Files
+**/animation/
