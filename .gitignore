@@ -85,14 +85,18 @@ env/
 # *.pkl               # Python pickle files (often large and not suitable for version control)
 *.mp4
 *.gif
+*.
 
 # IDE and Editor Files
 .vscode/              
 .idea/                
 *.swp                 
-*~                    
+*.code-workspace                
 
 # Miscellaneous
 *.log                 
 *.bak                 
 *.tmp                 
+
+# Output Files
+**/animation/
