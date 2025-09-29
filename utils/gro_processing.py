@@ -30,12 +30,13 @@ all = ['read_gro']
 # -----------------------------
 
 # Function to extract data from any type of .gro file
-def read_gro(file):
+def read_gro(file, multiply=1):
     """
     Reads a GROMACS .gro file and extracts atomic coordinates.
 
     Args:
         file (str): The path to the .gro file.
+        multiply (int, optional): Factor to change units. Defaults to 1.
 
     Returns:
         pd.DataFrame: A DataFrame containing all data from .gro file.
@@ -78,6 +79,11 @@ def read_gro(file):
         skiprows=2,
         skipfooter=1,
     )
+    
+    # Multiply the units
+    data[['x', 'y', 'z']] *= multiply
+    data[['Vx', 'Vy', 'Vz']] *= multiply
+    box_dimensions *= multiply
 
     # Problem: After atom id 99999, it reverts back to 0. The following solves this:
     overflow_count = num_atoms // 100_000
