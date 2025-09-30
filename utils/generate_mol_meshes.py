@@ -1,6 +1,31 @@
 """
-hello
+This module provides functionality to convert molecular simulation data (coordinates
+and atom types) into 3D geometric meshes, primarily using the ball-and-stick
+representation suitable for visualization. It accounts for Periodic Boundary
+Conditions (PBC) when constructing bonds across box boundaries.
+
+The meshing process is optimized for performance using `trimesh` for geometry
+operations and `multiprocessing` for parallel processing of individual molecules.
+
+Main Functions:
+- molecules_to_meshes(): Main entry point to convert a dictionary of molecules
+  into a dictionary of trimesh objects in parallel.
+  
+Helper Functions:
+- infer_element(): Utility to determine the element type from an atom name.
+- build_molecule_ballstick(): Core function to generate the ball-and-stick mesh
+  for a single molecule.
+- process_single_molecule(): Wrapper to process a single molecule for parallelism.
+
+Dependencies:
+- numpy
+- trimesh
+- scipy (for KDTree)
+- tqdm (for progress bar)
+- multiprocessing
+- mic_helper (local module for MIC calculations)
 """
+
 
 import multiprocessing as mp
 from functools import partial
@@ -216,7 +241,6 @@ def molecules_to_meshes(molecules, box_dimensions,
     # parallel execution
     mol_items = list(molecules.items())
     num_mol = len(mol_items)
-    
     with mp.Pool(processes=num_processes) as pool:
         tqdm_iterator = tqdm(
             pool.imap(process_func, mol_items),

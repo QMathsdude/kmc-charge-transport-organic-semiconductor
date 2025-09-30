@@ -11,9 +11,8 @@ Main Functions:
 - read_gro(): Read .gro file and extract atomic data with metadata
 
 Dependencies:
-- pandas >= 1.3.0
-- numpy >= 1.21.0
-- numba >= 0.53.0 (for JIT)
+- pandas
+- numpy 
 """
 
 

@@ -1,7 +1,17 @@
 """
-Utility functions for molecular simulations, including Minimum Image Convention (MIC) calculations.
-"""
+This module provides core utility functions essential for post-processing and
+analysis within molecular dynamics simulations, specifically those involving
+Periodic Boundary Conditions (PBC).
 
+Main Functions:
+- mic_vector(): Calculate MIC displacement vector.
+- mic_distance(): Calculate MIC scalar distance.
+- wrap_points(): Wrap coordinates into the primary box.
+
+Dependencies:
+- numpy
+- numba (for @njit)
+"""
 
 import numpy as np
 from numba import njit
