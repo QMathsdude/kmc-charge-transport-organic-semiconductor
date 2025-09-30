@@ -9,28 +9,23 @@ File Format Support:
 
 Main Functions:
 - read_gro(): Read .gro file and extract atomic data with metadata
-- dataframe_gro(): Process raw .gro data into structured DataFrame with options
 
 Dependencies:
 - pandas >= 1.3.0
 - numpy >= 1.21.0
-- oxygen_midpoints module (for midpoint calculations)
-
-Note: For oxygen midpoint calculations, the input .gro file must contain
-      O1 and O2 atoms (typically from water molecules) with proper naming.
+- numba >= 0.53.0 (for JIT)
 """
 
 
 import pandas as pd
 import numpy as np
-from .oxygen_midpoints import compute_midpoints_df_jit
 
 all = ['read_gro']
 
 # -----------------------------
 
 # Function to extract data from any type of .gro file
-def read_gro(file, multiply=1):
+def read_gro(file, multiply=1, positions=True, velocities=False):
     """
     Reads a GROMACS .gro file and extracts atomic coordinates.
 
@@ -94,43 +89,16 @@ def read_gro(file, multiply=1):
         offset_mask = (np.arange(num_atoms) + 1) // 100_000
         data.loc[:,'atom_id'] += offset_mask * 100_000
 
-
-    return data, title, num_atoms, box_dimensions
-
-# -----------------------------
-
-# Function that processes the data nicely from a read .gro file
-def dataframe_gro(data, box_length,positions=True, velocities=False, oxygen_midpoints=True):
-    """
-    Process GROMACS .gro data into a structured DataFrame.
-
-    Args:
-        data (pd.DataFrame)               : The input DataFrame containing atomic coordinates.
-        box_length (np.float64)           : The length of the simulation box.
-        positions (bool, optional)        : Whether to include position data. Defaults to True.
-        velocities (bool, optional)       : Whether to include velocity data. Defaults to False.
-        oxygen_midpoints (bool, optional) : Whether to compute oxygen midpoints. Defaults to True.
-
-    Returns:
-        pd.DataFrame: A DataFrame containing the processed GROMACS data.
-    """
-    
     # Create multi-index using residue ID and atom name
-    df_gro = data.set_index(['res_id', 'atom_name'])
+    data = data.set_index(['res_id', 'atom_name'])
     
     # Choose what data to display
     if positions == False:
-        df_gro = df_gro.drop(columns=['x', 'y', 'z'])
+        data = data.drop(columns=['x', 'y', 'z'])
     if velocities == False:
-        df_gro = df_gro.drop(columns=['Vx', 'Vy', 'Vz'])
-    if oxygen_midpoints == True:
-        midpoints_df = compute_midpoints_df_jit(data, box_length)
-        for idx, row in midpoints_df.iterrows():
-            df_gro.loc[(row['res_id'], slice(None)), 'midO_x'] = row['mid_x']
-            df_gro.loc[(row['res_id'], slice(None)), 'midO_y'] = row['mid_y']
-            df_gro.loc[(row['res_id'], slice(None)), 'midO_z'] = row['mid_z']
-    
-    return df_gro
+        data = data.drop(columns=['Vx', 'Vy', 'Vz'])
+
+    return data, title, num_atoms, box_dimensions
 
 # -----------------------------
 
