@@ -165,7 +165,7 @@ def molecules_to_meshes(molecules, box_dimensions,
                         sphere_radius_scale=0.3,
                         sphere_subdiv=2,
                         bond_radius=0.1,
-                        num_processes=None):
+                        num_processes=None, context="spawn"):
     """
     Convert parsed molecules into trimesh meshes.
 
@@ -184,6 +184,8 @@ def molecules_to_meshes(molecules, box_dimensions,
         Cylinder radius for bonds
     num_processes: int/None
         Number of CPU cores to use (all if not specified)
+    context: str
+        Either "spawn" or "fork". Windows users are only limited to using "spawn", while Mac and Linux users can use the faster "fork"
 
     Returns
     -------
@@ -217,7 +219,10 @@ def molecules_to_meshes(molecules, box_dimensions,
     mol_items = list(molecules.items())
     num_mol = len(mol_items)
     
-    with mp.Pool(processes=num_processes) as pool:
+    # By default set mp.get_context to spawn for compatibality with Linux Mac and Windows users
+    ctx = mp.get_context(context)
+
+    with ctx.Pool(processes=num_processes) as pool:
         tqdm_iterator = tqdm(
             pool.imap(process_func, mol_items),
             total=num_mol,
