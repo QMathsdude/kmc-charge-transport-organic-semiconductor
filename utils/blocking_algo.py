@@ -273,7 +273,6 @@ def blocked_by_any(i, j, e_centroids, centroids, radii, mol_meshes, neighbor_can
         True if the path between i and j is blocked by any other molecule, False otherwise.
     """
     # Map molecule IDs to their index in ids
-
     ci, cj = e_centroids[i], e_centroids[j]
     seg_vec = cj - ci
     seg_len = np.linalg.norm(seg_vec)
@@ -389,15 +388,15 @@ def find_neighbors(mol_meshes, df_gro, box_dimensions, path, k=10, export_csv=Fa
         name = os.path.basename(path).rsplit('.', 1)[0] # e.g., 'npt-HK4'
         
         df_e_centroids = pd.DataFrame(e_centroids, index=['x', 'y', 'z']).T
-        df_e_centroids.to_csv(f'{name}_e_centroids.csv', index_label='res_id')
+        df_e_centroids.to_csv(f'{name}_e_centroids.csv', index_label='res_id', mode='w')
         print(f"Successfully exported {name}_e_centroids.csv")
 
         df_centroids = pd.DataFrame(centroids, index=['x', 'y', 'z']).T
-        df_centroids.to_csv(f'{name}_centroids.csv', index_label='res_id')
+        df_centroids.to_csv(f'{name}_centroids.csv', index_label='res_id', mode='w')
         print(f"Successfully exported {name}_centroids.csv")
 
         df_neighbors_candidates = pd.DataFrame(neighbor_candidates, columns=['mol_id_1', 'mol_id_2'])
-        df_neighbors_candidates.to_csv(f'{name}_neighbor_candidates.csv', index=False)
+        df_neighbors_candidates.to_csv(f'{name}_neighbor_candidates.csv', index=False, mode='w')
         print(f"Successfully exported {name}_neighbor_candidates.csv")
 
         # df_neighbor_pairs = pd.DataFrame(neighbor_pairs, columns=['mol_id_1', 'mol_id_2'])
