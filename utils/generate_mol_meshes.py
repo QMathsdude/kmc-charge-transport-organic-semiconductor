@@ -7,32 +7,32 @@ Sections:
 ----------
 1. Generating Molecular Meshes
     - Main Function:
-      - molecules_to_meshes(): Converts molecular coordinate data into trimesh objects in parallel.
+      - molecules_to_meshes(): Convert all parsed molecules into trimesh meshes in parallel.
     - Helper Functions:
       - infer_element(): Infers element type from atom name.
       - create_mol_dict(): Builds molecule dictionary from DataFrame.
       - build_molecule_ballstick(): Constructs ball-and-stick mesh for a molecule.
       - process_single_molecule(): Processes a single molecule for parallelization.
 
-2. Exporting Molecular Meshes
+2. Export Molecular Meshes
     - Main Function:
-      - export_meshes(): Exports meshes to .npz or .ply formats.
+      - export_meshes(): Exports meshes to NPZ or PLY formats.
     - Helper Functions:
-      - npz_extract_mesh_data(): Extracts mesh arrays for .npz export.
-      - npz_export_meshes(): Saves all meshes to a compressed .npz file.
-      - ply_export_single_mesh(): Exports a single mesh to .ply.
-      - ply_export_meshes(): Saves all meshes as .ply files in a directory.
-      - Spinner: Class for loading spinner (another loading bar).
+      - npz_extract_mesh_data(): Extracts mesh arrays from compressed NPZ file.
+      - npz_export_meshes(): Saves all meshes to a compressed NPZ file.
+      - ply_export_single_mesh(): Exports a single mesh to a single PLY file.
+      - ply_export_meshes(): Exports all meshes as multiple PLY files into a directory.
+      - Spinner: Helper class for loading bar.
 
-3. Importing Molecular Meshes
+3. Import Molecular Meshes
     - Main Function:
-      - import_meshes(): Loads meshes from .npz file or .ply directory.
+      - import_meshes(): Loads meshes from NPZ file or PLY directory.
     - Helper Functions:
-      - npz_load_meshes(): Loads and reconstructs meshes from .npz.
-      - ply_count(): Counts .ply files in a directory.
-      - ply_find(): Finds .ply files in a directory.
-      - ply_load_single_mesh(): Loads a single .ply mesh.
-      - ply_load_meshes(): Loads all .ply meshes in parallel.
+      - npz_load_meshes(): Loads and reconstructs meshes from NPZ.
+      - ply_count(): Counts PLY files in a directory.
+      - ply_find(): Finds PLY files in a directory.
+      - ply_load_single_mesh(): Loads a single mesh from a single PLY file.
+      - ply_load_meshes(): Loads all meshes from directory containing PLY(s) in parallel.
 
 Dependencies Notes:
 --------------------
@@ -40,8 +40,8 @@ Dependencies Notes:
     - multiprocessing
     - partial (create partial functions)
     - tqdm (loading bar)
-    
-2. Another loading bar
+
+2. Spinner loading bar
     - threading
     - time
     - itertools
@@ -83,9 +83,8 @@ color_map = {'O': np.array([220, 20, 60, 255], dtype=np.uint8),     # Crimson Re
              'H': np.array([230, 230, 230, 255], dtype=np.uint8),   # Light Gray
             }
 
-
 # ------------------------------
-# CREATING MOLECULE MESHES
+# 1. CREATING MOLECULE MESHES
 # ------------------------------
 
 # --------- HELPER FUNCTIONS ---------
@@ -98,29 +97,22 @@ def infer_element(atomname):
     
     # simple: first letter, capitalize second if lowercase
     a = ''.join([c for c in atomname if c.isalpha()])   
-    
     # join() joins items in an iterable into one string, '' is specified as the separator.
     # isalpha() method returns True if all the characters are alphabet letters (a-z).
 
-    if a == '': 
-        return "C"
-
-    if len(a) >= 2 and a[1].islower(): 
-        return (a[0]+a[1]).capitalize()
-    
+    if a == '': return "C" # Atom name not stated, default to Carbon
+    if len(a) >= 2 and a[1].islower(): return (a[0]+a[1]).capitalize()
     return a[0].upper()
-
 
 def create_mol_dict(df_gro):
     """Creates a dictionary of molecules from a DataFrame."""
     molecules = {}
     for res_id in df_gro.index.get_level_values('res_id').unique():
         residue_data = df_gro.xs(res_id, level='res_id')
-        # itertuples() - much faster for large DataFrames
         atom_list = [(row.Index, np.array([row.x, row.y, row.z])) for row in residue_data.itertuples()]
         molecules[res_id] = atom_list
+        
     return molecules
-
 
 def build_molecule_ballstick(coords, elements, 
                              vdw, cov, box_length, 
@@ -200,7 +192,6 @@ def build_molecule_ballstick(coords, elements,
     molecule = trimesh.util.concatenate(meshes_sphere.tolist() + meshes_cylinder)
     return molecule
 
-
 def process_single_molecule(mol_items,  
                             vdw, cov, box_length,
                             sphere_radius_scale=0.3, 
@@ -220,7 +211,6 @@ def process_single_molecule(mol_items,
     
     return mol_id, mesh
 
-
 # --------- MAIN FUNCTION ---------
 
 def molecules_to_meshes(df_gro, box_dimensions,
@@ -230,7 +220,7 @@ def molecules_to_meshes(df_gro, box_dimensions,
                         num_processes=None, 
                         context="spawn"):
     """
-    Convert all parsed molecules into trimesh meshes.
+    Convert all parsed molecules into trimesh meshes in parallel.
 
     Parameters
     ----------
@@ -247,8 +237,8 @@ def molecules_to_meshes(df_gro, box_dimensions,
     num_processes: int/None
         Number of CPU cores to use (all if not specified)
     context: str
-        Either "spawn" or "fork". Windows users are only limited to using "spawn", 
-        while Mac and Linux users can use the faster "fork"
+        Either "spawn" or "fork". Windows users only use "spawn", 
+        while Mac and Linux may use the faster "fork"
 
     Returns
     -------
@@ -295,14 +285,14 @@ def molecules_to_meshes(df_gro, box_dimensions,
     return mol_meshes
 
 # ------------------------------
-# EXPORTING MOLECULE MESHES
+# 2. EXPORT MOLECULE MESHES
 # ------------------------------
 
 # --------- HELPER FUNCTIONS ---------
 
 class Spinner:
     """
-    Simple loading bar when tqdm does not work (e.g. single process).
+    Simple loading bar when tqdm is not appropriate (e.g. single process).
     """
     def __init__(self, message="Working..."):
         self._message = message
@@ -316,7 +306,6 @@ class Spinner:
             sys.stdout.write(f'\r{self._message}{next(spinner)}   ') 
             sys.stdout.flush() 
             time.sleep(0.5)
-
         # Final message to show completion and move to a new line
         sys.stdout.write(f'\rDone: {self._message} complete!   \n')
         sys.stdout.flush()
@@ -330,8 +319,7 @@ class Spinner:
         self._done = True
         self._thread.join()
         
-        
-# Functions for NPZ
+# --- Functions for NPZ ---
 def npz_extract_mesh_data(mol_items):
     """
     Extract and return a single mesh data: mol_id, vertices, faces, and colors.
@@ -384,7 +372,7 @@ def npz_export_meshes(mol_meshes, path, num_processes=None, context='spawn'):
             all_mesh_data.update(data_dict)
     print(f'Converted {num_mol} molecular meshes into {len(all_mesh_data)} numpy arrays.')
     
-    # Save to .npz file
+    # Save to NPZ file
     loading = Spinner(f"Saving all meshes to {output_file}")
     loading.start()
     np.savez_compressed(output_file, **all_mesh_data)
@@ -394,8 +382,7 @@ def npz_export_meshes(mol_meshes, path, num_processes=None, context='spawn'):
     print(f"File size: {os.path.getsize(output_file) / (1024*1024):.2f} MB")
     return None
 
-
-# Functions for PLY
+# --- Functions for PLY ---
 def ply_export_single_mesh(mol_items, name):
     """
     Export a single mesh to a single PLY file.
@@ -448,7 +435,7 @@ def ply_export_meshes(mol_meshes, path, num_processes=None, context='spawn'):
 def export_meshes(mol_meshes, path, export_format='npz', num_processes=None, context='spawn'):
     """
     Export molecular meshes to a specified file format ('npz' or 'ply').
-    The parameter 'path' should be the path to your 'gro' file (e.g. './npt-HK4.gro').
+    Parameter 'path' is to your GRO file (e.g. './npt-HK4.gro').
     
     Creating a PLY file is faster but results in larger file sizes.
     Meanwhile, a NPZ file is more compact but takes longer to create.
@@ -458,19 +445,20 @@ def export_meshes(mol_meshes, path, export_format='npz', num_processes=None, con
     mol_meshes : dict[int, trimesh.Trimesh]
         A dictionary where keys are molecule IDs (int) and values are
         the corresponding molecular meshes (trimesh.Trimesh objects).
+    path : str
+        The path to the source GRO file (e.g. './npt-HK4.gro').
     export_format : str
-        The file format used for exporting the meshes (e.g., 'npz', 'ply).
+        The file format used for exporting the meshes (e.g., 'npz', 'ply').
     num_processes : int, optional
         The number of processes to use for parallel execution. If None,
         the function will use all available CPU cores. Default is None.
     context : str, optional
-        Either "spawn" or "fork". Windows users are only limited to using "spawn", 
-        while Mac and Linux users can use the faster "fork"
+        Either "spawn" or "fork". Windows users only use "spawn", 
+        while Mac and Linux may use the faster "fork"
 
     Returns
     -------
     None
-        The function performs a disk write operation and does not return a value.
     """
     if export_format == 'npz':
         npz_export_meshes(mol_meshes, path=path, num_processes=num_processes, context=context)
@@ -482,12 +470,12 @@ def export_meshes(mol_meshes, path, export_format='npz', num_processes=None, con
     return None
 
 # ------------------------------
-# IMPORTING MOLECULE MESHES
+# 3. IMPORT MOLECULE MESHES
 # ------------------------------
 
 # --------- HELPER FUNCTIONS ---------
 
-# Functions for NPZ
+# --- Functions for NPZ ---
 def npz_load_meshes(file):
     """
     Extracts all mesh components from  NPZ file, (e.g. 'npt-HK4_meshes.npz'), 
@@ -532,10 +520,10 @@ def npz_load_meshes(file):
         )
         # Store the mesh in the dictionary
         mol_meshes[mol_id] = reconstructed_mesh
+        
     return mol_meshes
 
-
-# Functions for PLY
+# --- Functions for PLY ---
 def ply_count(path): # just for progress bar
     """
     Count the total number of PLY files in a directory.
@@ -598,7 +586,7 @@ def ply_load_meshes(directory, num_processes=None, context='spawn'):
 
 def import_meshes(path, num_processes=None, context='spawn'):
     """
-    Load mesh files from a specified path, supporting both NPZ archives 
+    Import meshes from a specified path, supporting both NPZ files 
     and directories containing PLY files. For example:
 
     To load from an NPZ file:
@@ -615,8 +603,8 @@ def import_meshes(path, num_processes=None, context='spawn'):
     num_processes : int, optional
         The number of processes to use for parallel loading.
     context : str, optional
-        Either "spawn" or "fork". Windows users are only limited to using "spawn", 
-        while Mac and Linux users can use the faster "fork"
+        Either "spawn" or "fork". Windows users only use "spawn", 
+        while Mac and Linux may use the faster "fork"
 
     Returns
     -------
@@ -624,7 +612,7 @@ def import_meshes(path, num_processes=None, context='spawn'):
         Dictionary of molecule meshes keyed by mol_id
     """
     # 1. Npz file
-    if os.path.isfile(path) and path.endswith('.npz'):
+    if os.path.isfile(path) and path.endswith('.npz'): 
         return npz_load_meshes(path)
     
     # 2 . Directory of PLY files
@@ -635,5 +623,13 @@ def import_meshes(path, num_processes=None, context='spawn'):
         else: raise ValueError(f"No .ply files found in directory: {path}")
         
     # 3. Unsupported file type
-    else:
-        raise ValueError(f"Unsupported path or file type: {path}")
+    else: raise ValueError(f"Unsupported path or file type: {path}")
+    
+# -----------------------------
+
+# Export wildcard
+__all__ = ['molecules_to_meshes', 'export_meshes', 'import_meshes']
+
+# Check from CLI
+if __name__ == "__main__":
+    print("Running generate_mol_meshes.py as a script")

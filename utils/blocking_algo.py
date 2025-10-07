@@ -1,6 +1,7 @@
 """
-This module provides algorithms for identifying neighboring molecules and blocked paths
-in molecular simulations, with support for periodic boundary conditions (PBC).
+This module provides functions to find centroids (even user defined centroids), 
+algorithm which identifies unblocked neighbor pairs and visual verification of
+blocking, all under periodic boundary conditions (PBC).
 
 Sections:
 ----------
@@ -21,32 +22,51 @@ Sections:
       
 4. Blocking Algorithm
     - Main Function:
-      - find_neighbors(): Main pipeline to compute neighbor_pairs, centroids, radii, neighbor candidates, and optionally export results.
+      - find_neighbor_pairs(): Compute neighbor_pairs, centroids, radii, neighbor candidates, and optionally export results.
     - Helper Functions:
-      - blocked_by_any(): Checks if the direct path between two molecules is blocked by any other molecule using sphere rejection and ray-mesh intersection.
+      - blocked_by_any(): Checks if direct path between two molecules is blocked by using ray-mesh intersection.
       - true_neighbors(): Determines unblocked neighbor pairs from candidate pairs using geometric and mesh intersection tests.
+      
+5. Import Neighbor Pairs
+    - Main Function:
+        - import_csv(): Imports either neighbor_pairs, e_centroids, centroids and neighbor_candidates from CSV files.
+        
+6. Verify Blocking Molecules
+    - Main Function:
+        - view_molecule(): Visualizes molecular blocking.
+    - Helper Functions:
+        - map_symmetric_neighbors(): Maps neighbor pairs to a symmetric dictionary for easy lookup.
+        - get_distinct_colors(): Generates distinct colors for visualization.
+        - get_user_input_unpaired(): Handles user input for selecting unpaired neighbors to view.
 
 Dependencies Notes:
 --------------------
-- time (for immersive user input)
+- ast (to safely evaluate user input)
 - chain (to flatten lists)
+- defaultdict (for easy dictionary of lists)
+- get_cmap (for color maps)
+- time (for immersive user input)
 """
 
+import ast
 import multiprocessing as mp
 import os
 import time
+from collections import defaultdict
 from itertools import chain
 
 import numpy as np
 import pandas as pd
 import trimesh
+from matplotlib import colors as mcolors
+from matplotlib.pyplot import get_cmap
 from scipy.spatial import KDTree
 from tqdm import tqdm
 
 from . import mic_helper as mh
 
 # ------------------------------
-# GENERATE E-CENTROIDS
+# 1. GENERATE E-CENTROIDS
 # ------------------------------
 
 # --------- HELPER FUNCTIONS ---------
@@ -101,17 +121,18 @@ def calculate_e_centroids(mol_meshes, df_gro, box_dimensions):
     Parameters
     ----------
     mol_meshes : dict[int, trimesh.Trimesh]
-        Dictionary of molecule meshes.
+        Dictionary where keys are molecule IDs (int) and values are
+        the corresponding molecular meshes (trimesh.Trimesh objects).
     df_gro : pd.DataFrame
-        Multi-index DataFrame containing atom positions with indices (res_id, atom_id).
-    box_dimensions : array-like, shape (3,) or (3,3)
-        Simulation box dimensions (in Å).  
+        DataFrame containing molecular data, multi-indexed by (res_id, atom_name).
+    box_dimensions : np.ndarray
+        Simulation box_dimensions (Å), shape (3,) for orthorhombic or (3,3) for triclinic
 
     Returns
     -------
     e_centroids : dict[int, np.ndarray]
-        Dictionary of electron clump centroids for each molecule, with keys as molecule IDs
-        and values as numpy arrays of shape (3,) representing the (x, y, z) coordinates.
+        Dictionary where keys are molecule IDs (int) and values are
+        the corresponding electron clump centroids (numpy arrays of shape (3,)).
     """
     # This assumes all molecules are similar (each have exactly identical atoms)
     res_ids = list(mol_meshes.keys()) # list of molecule ids
@@ -142,10 +163,9 @@ def calculate_e_centroids(mol_meshes, df_gro, box_dimensions):
     return e_centroids
 
 # ------------------------------
-# GENERATE CENTROIDS & RADII
+# 2. GENERATE CENTROIDS & RADII
 # ------------------------------
 
-# Calculate the true centroids and effective radii using vertices of molecule meshes
 def compute_centroids_and_radii_pbc(mol_meshes, box_dimensions):
     """
     Compute periodic-boundary-condition (PBC) aware centroids and radii for a set of molecules.
@@ -160,17 +180,19 @@ def compute_centroids_and_radii_pbc(mol_meshes, box_dimensions):
     Parameters
     ----------
     mol_meshes : dict[int, trimesh.Trimesh]
-        Dictionary mapping molecule IDs to their corresponding trimesh mesh objects.
-    box_dimensions : array-like, shape (3,) or (3,3)
-        Simulation box dimensions (in Å). Should be a 3-element array for orthorhombic boxes.
+        Dictionary where keys are molecule IDs (int) and values are
+        the corresponding molecular meshes (trimesh.Trimesh objects).
+    box_dimensions : np.ndarray
+        Simulation box_dimensions (Å), shape (3,) for orthorhombic or (3,3) for triclinic
 
     Returns
     -------
     centroids : dict[int, np.ndarray]
-        Dictionary mapping molecule IDs to their centroid coordinates (in Å), unwrapped in PBC.
+        Dictionary where keys are molecule IDs (int) and values are
+        the corresponding centroids (numpy arrays of shape (3,)).
     radii : dict[int, float]
-        Dictionary mapping molecule IDs to their effective radii (in Å), defined as the maximum MIC distance
-        from the centroid to any vertex in the molecule.
+        Dictionary where keys are molecule IDs (int) and values are
+        their maximum radii measured from centroid to furthest atom.
     """
     centroids, radii = {}, {}
     # box_dimensions = np.array(box_dimensions, dtype=float)
@@ -194,19 +216,20 @@ def compute_centroids_and_radii_pbc(mol_meshes, box_dimensions):
     return centroids, radii
 
 # ------------------------------
-# NEIGHBOR CANDIDATES
+# 3. NEIGHBOR CANDIDATES
 # ------------------------------
 
-def get_neighbor_candidates(box, centroids, k=10):
+def get_neighbor_candidates(box_dimensions, centroids, k=10):
     """
     Find the k nearest neighbors of each molecule, based on centroid distance.
     
     Parameters
     ----------
-    box : array-like, shape (3,) or (3,3)
-        Simulation box dimensions (in Å). Should be a 3-element array for orthorhombic boxes.
+    box_dimensions : np.ndarray
+        Simulation box_dimensions (Å), shape (3,) for orthorhombic or (3,3) for triclinic
     centroids : dict[int, np.ndarray]
-        Dictionary mapping molecule IDs to their centroid coordinates (in Å).
+        Dictionary where keys are molecule IDs (int) and values are
+        the corresponding centroids (numpy arrays of shape (3,)).
     k : int, optional
         Number of nearest neighbors to return per molecule. Default is 10.
 
@@ -218,8 +241,8 @@ def get_neighbor_candidates(box, centroids, k=10):
 
     ids = list(centroids.keys())
     coords = np.vstack([centroids[i] for i in ids])
-    coords_wrapped = mh.wrap_points(coords, box)
-    kd = KDTree(coords_wrapped, boxsize=box)
+    coords_wrapped = mh.wrap_points(coords, box_dimensions)
+    kd = KDTree(coords_wrapped, boxsize=box_dimensions)
 
     neighbors = {}
     for idx, mol_id in enumerate(ids):
@@ -237,7 +260,7 @@ def get_neighbor_candidates(box, centroids, k=10):
 
 
 # ------------------------------
-# BLOCKING ALGORITHM
+# 4. BLOCKING ALGORITHM
 # ------------------------------
 
 # --------- HELPER FUNCTIONS ---------
@@ -261,11 +284,14 @@ def blocked_by_any(i, j, e_centroids, centroids, radii, mol_meshes, neighbor_can
     i, j : int
         IDs of the two molecules to test for a direct connection.
     e_centroids : dict[int, np.ndarray]
-        Dictionary mapping molecule IDs to their centroid coordinates (in Å).
+        Dictionary where keys are molecule IDs (int) and values are
+        the corresponding electron clump centroids (numpy arrays of shape (3,)).
     radii : dict[int, float]
-        Dictionary mapping molecule IDs to their effective radii (in Å).
+        Dictionary where keys are molecule IDs (int) and values are
+        their maximum radii measured from centroid to furthest atom.
     mol_meshes : dict[int, trimesh.Trimesh]
-        Dictionary mapping molecule IDs to their trimesh mesh objects.
+        Dictionary where keys are molecule IDs (int) and values are
+        the corresponding molecular meshes (trimesh.Trimesh objects).
 
     Returns
     -------
@@ -313,13 +339,17 @@ def true_neighbors(e_centroids, centroids, radii, mol_meshes, neighbor_candidate
     Parameters
     ----------
     e_centroids : dict[int, np.ndarray]
-        Dictionary mapping molecule IDs to their electron clump centroid coordinates (in Å).
+        Dictionary where keys are molecule IDs (int) and values are
+        the corresponding electron clump centroids (numpy arrays of shape (3,)).
     centroids : dict[int, np.ndarray]
-        Dictionary mapping molecule IDs to their centroid coordinates (in Å).
+        Dictionary where keys are molecule IDs (int) and values are
+        the corresponding centroids (numpy arrays of shape (3,)).
     radii : dict[int, float]
-        Dictionary mapping molecule IDs to their effective radii (in Å).
+        Dictionary where keys are molecule IDs (int) and values are
+        their maximum radii measured from centroid to furthest atom
     mol_meshes : dict[int, trimesh.Trimesh]
-        Dictionary mapping molecule IDs to their trimesh mesh objects.
+        Dictionary where keys are molecule IDs (int) and values are
+        the corresponding molecular meshes (trimesh.Trimesh objects).
     neighbor_candidates : list[tuple[int, int]]
         List of candidate neighbor pairs (i, j) to test for blocking.
 
@@ -341,31 +371,34 @@ def true_neighbors(e_centroids, centroids, radii, mol_meshes, neighbor_candidate
 
 # --------- MAIN FUNCTION ---------
 
-def find_neighbors(mol_meshes, df_gro, box_dimensions, path, k=10, export_csv=False):
+def find_neighbor_pairs(mol_meshes, df_gro, box_dimensions, path, k=10, export_csv=False):
     """
     Determine all unblocked neighbor pairs.
 
     Parameters
     ----------
     mol_meshes : dict[int, trimesh.Trimesh]
-        Dictionary mapping molecule IDs to their trimesh mesh objects.
+        Dictionary where keys are molecule IDs (int) and values are
+        the corresponding molecular meshes (trimesh.Trimesh objects).
     df_gro : pd.DataFrame
-        DataFrame containing molecular structure data.
-    box_dimensions : array-like, shape (3,) or (3,3)
-        Simulation box dimensions (in Å).
+        DataFrame containing molecular data, multi-indexed by (res_id, atom_name).
+    box_dimensions : np.ndarray
+        Simulation box_dimensions (Å), shape (3,) for orthorhombic or (3,3) for triclinic
     k : int, optional
         Number of nearest neighbors to consider per molecule.
     export_csv : bool, optional
-        Whether to export intermediate data (e_centroids, centroids, neighbor_candidates) as CSV files.
+        Whether to export intermediate data (e_centroids, centroids, neighbor_candidates or neighbor_pairs) as CSV files.
 
     Returns
     -------
     neighbor_pairs : list[tuple[int, int]]
         List of unblocked neighbor pairs (i, j).
     e_centroids : dict[int, np.ndarray]
-        Dictionary of electron clump centroids for each molecule.
+        Dictionary where keys are molecule IDs (int) and values are
+        the corresponding electron clump centroids (numpy arrays of shape (3,)).
     centroids : dict[int, np.ndarray]
-        Dictionary of centroids for each molecule.
+        Dictionary where keys are molecule IDs (int) and values are
+        the corresponding centroids (numpy arrays of shape (3,)).
     neighbor_candidates : list[tuple[int, int]]
         List of candidate neighbor pairs (i, j).
     """
@@ -379,11 +412,11 @@ def find_neighbors(mol_meshes, df_gro, box_dimensions, path, k=10, export_csv=Fa
     neighbor_candidates = get_neighbor_candidates(box_dimensions, centroids, k)
     
     # 4. Find true neighbors
-    # neighbor_pairs = true_neighbors(e_centroids, centroids, radii, mol_meshes, neighbor_candidates)
+    neighbor_pairs = true_neighbors(e_centroids, centroids, radii, mol_meshes, neighbor_candidates)
     
     
     # Export as csv file
-    if export_csv == True:
+    if export_csv is True:
         print('-' * 40)
         name = os.path.basename(path).rsplit('.', 1)[0] # e.g., 'npt-HK4'
         
@@ -399,9 +432,269 @@ def find_neighbors(mol_meshes, df_gro, box_dimensions, path, k=10, export_csv=Fa
         df_neighbors_candidates.to_csv(f'{name}_neighbor_candidates.csv', index=False, mode='w')
         print(f"Successfully exported {name}_neighbor_candidates.csv")
 
-        # df_neighbor_pairs = pd.DataFrame(neighbor_pairs, columns=['mol_id_1', 'mol_id_2'])
-        # df_neighbor_pairs.to_csv(f'{name}_neighbor_pairs.csv', index=False)
-        # print(f"Exported {name}_neighbor_pairs.csv")
+        df_neighbor_pairs = pd.DataFrame(neighbor_pairs, columns=['mol_id_1', 'mol_id_2'])
+        df_neighbor_pairs.to_csv(f'{name}_neighbor_pairs.csv', index=False)
+        print(f"Exported {name}_neighbor_pairs.csv")
 
-    return e_centroids, centroids, neighbor_candidates
-    # return neighbor_pairs, e_centroids, centroids, neighbor_candidates
+    return neighbor_pairs, e_centroids, centroids, neighbor_candidates
+
+
+# ------------------------------
+# 5. IMPORT NEIGHBOR PAIRS
+# ------------------------------
+
+def import_csv(path):
+    """
+    Function to import CSV file and return data in appropriate format.
+    
+    Parameters
+    ----------
+    path : str
+        Path to the CSV file.
+
+    Returns
+    -------
+    dict[int, arr] or list[tuple]
+        The imported data in appropriate format.
+    """
+    try:
+        # Predefined formats
+        centroids_format = ['res_id', 'x', 'y', 'z']
+        neighbors_format = ['mol_id_1', 'mol_id_2']
+        
+        # Process CSV
+        header = list(pd.read_csv(path, nrows=0)) # Checks the header of the CSV file
+        if header == centroids_format: 
+            df_centroids = pd.read_csv(path)
+            data = {mol_id: np.array([x, y, z]) for _, mol_id, x, y, z in df_centroids.itertuples()}
+            print(f"Successfully imported centroids CSV file: '{path}'.")
+            return data
+        elif header == neighbors_format:
+            df_neighbors = pd.read_csv(path)
+            data = [(mol_id_1, mol_id_2) for _, mol_id_1, mol_id_2 in df_neighbors.itertuples()]
+            print(f"Successfully imported neighbors CSV file: '{path}'.")
+            return data
+        else:
+            raise ValueError(f"Unrecognized CSV format. Found header: {header}")
+    
+    # Error checks
+    except ValueError as e:
+        print(f"[Error] {e}")
+        return None
+        
+    except FileNotFoundError as e:
+        print(e)
+        return None
+    
+    except Exception as e:
+        print(f"Error: An unexpected error occurred while importing '{path}'. Details: {e}")
+        return None
+   
+   
+# ------------------------------
+# 6. VERIFY BLOCKING MOLECULES
+# ------------------------------ 
+
+# --------- HELPER FUNCTIONS ---------
+    
+def map_symmetric_neighbors(neighbor_candidates, centroids, fill_no_neighbor_mols=False):
+    """
+    Function to create a symmetric mapping of neighbor candidates.
+    Returns a dictionary mapping each molecule ID to a list of its neighbors,
+    e.g. {1:[2,4], 2:[1,4], 3:[], 4:[1,2]}.
+    """
+    # Create symmetric pairing
+    neighbor_map = defaultdict(list)
+    for mol_id_1, mol_id_2 in neighbor_candidates:
+        neighbor_map[mol_id_1].append(mol_id_2) # Pass 1
+        neighbor_map[mol_id_2].append(mol_id_1) # Pass 2
+    
+    # Molecules with no neighbors are added to dict
+    if fill_no_neighbor_mols is True:
+        superset = set(centroids.keys()) # centroids imported just for its keys (mol ID)
+        subset = set(neighbor_map.keys())
+        no_neighbor_mols = superset - subset
+        for mol_id in no_neighbor_mols:
+            neighbor_map[mol_id] = []
+        
+    neighbor_candidates_symmetric = dict(neighbor_map)
+    return neighbor_candidates_symmetric
+
+def get_distinct_colors(n, alpha=200, method='hsv'):
+    """
+    Return a list of n RGBA colors in 0-255 int format.
+    method: 'hsv' (even hue spacing) or 'matplotlib_tab' (uses tab20).
+    alpha: 0-255
+    """
+    # Invalid number or 0
+    if n <= 0: return []
+    
+    # If using matplotlib color scheme
+    if method == 'matplotlib_tab':
+        cmap = get_cmap('tab20') # tab20 has up to 20 distinct categorical colors
+        colors = [cmap(i) for i in range(n)] # cmap returns RGBA floats 0-1
+        colors = [(int(r*255), int(g*255), int(b*255), int(a*255)) for (r,g,b,a) in colors]
+        return colors
+    
+    # Evenly spaced HSV hues (good for 1 to 11 colors)
+    hues = np.linspace(0, 1, n, endpoint=False)
+    sats = 0.65   # saturation
+    vals = 0.90   # value (brightness)
+    colors = []
+    for h in hues:
+        rgb = mcolors.hsv_to_rgb((h, sats, vals))  # returns 3 floats 0..1
+        colors.append((int(rgb[0]*255), int(rgb[1]*255), int(rgb[2]*255), int(alpha)))
+    return colors
+
+def get_user_input_unpaired(exclusive_ids):
+    """
+    Handles the user prompt for selecting unpaired neighbors to view.
+    """
+    print("Select the non-paired neighbors to view. Use the following format:")
+    print("  - For specific molecules: '[101, 104, 403]'")
+    print("  - For all neighbors: 'all'")
+    print(f"  - For no neighbors: ''\n{"-" * 40}")
+    time.sleep(1)
+    view_ids = input("View: ")
+    
+    # Process user input
+    try: 
+        view_input = view_ids.strip().lower()
+        if view_input == 'all':
+            user_select_ids = exclusive_ids
+            return user_select_ids
+        elif view_input == '': 
+            user_select_ids = []
+            return user_select_ids
+        else: 
+            user_select_ids = ast.literal_eval(view_ids) # Safely evaluate list input
+            # Check if user input is a list of integers
+            if not isinstance(user_select_ids, list) or not all(isinstance(int(x), int) for x in user_select_ids):
+                 raise ValueError("Input is not a valid list of integers.")
+            # Final validation check
+            if not set(user_select_ids).issubset(set(exclusive_ids)):
+                print(f"Selected molecule ID not in neighbor list. Please try again.")
+                return None
+            return user_select_ids
+    
+    # Error check
+    except Exception as e: # Invalid input format
+        print(f"Invalid input format. Please use the specified format or check IDs.")
+        return None
+    
+# --------- MAIN FUNCTION ---------
+
+def view_molecule(mol_id, e_centroids, mol_meshes, 
+                  neighbor_candidates, neighbor_pairs,
+                  view_unpaired_mols=None,
+                  distinct_color=False):
+    """
+    Function to visualize a molecule with its mesh, e-centroid, centroid, and neighbors.
+    
+    Parameters
+    ----------
+    mol_id: int
+        The ID of the molecule to visualize.
+    e_centroids : dict[int, np.ndarray]
+        Dictionary where keys are molecule IDs (int) and values are
+        the corresponding electron clump centroids (numpy arrays of shape (3,)).
+    mol_meshes : dict[int, trimesh.Trimesh]
+        Dictionary where keys are molecule IDs (int) and values are
+        the corresponding molecular meshes (trimesh.Trimesh objects).
+    neighbor_candidates : list[tuple[int, int]]
+        List of candidate neighbor pairs (i, j) to test for blocking.
+    neighbor_pairs : list[tuple[int, int]]
+        List of unblocked neighbor pairs (i, j).
+    view_unpaired_mols: boolean, int, list[int], None, optional
+        List of molecule IDs to specifically view. 
+            - True, view all unpaired neighbors.
+            - False, view no unpaired neighbors.
+            - int, view specified number of unpaired neighbors.
+            - list, view specific unpaired neighbors.
+            - None, prompt user for input.
+    distinct_color: boolean, optional
+        If True, use a distinct color scheme for the meshes for higher contrast.
+    Returns
+    -------
+    IPython.core.display.HTML
+        A Trimesh scene object for visualization.
+    """
+    # Parameters
+    snc = map_symmetric_neighbors(neighbor_candidates, e_centroids, fill_no_neighbor_mols=True)
+    snp = map_symmetric_neighbors(neighbor_pairs, e_centroids, fill_no_neighbor_mols=True)
+    snc_ids, snp_ids = snc[mol_id], snp[mol_id]
+    exclusive_ids = sorted(list(set(snc_ids).difference(set(snp_ids))))
+    
+    # Show to user paired neighbors
+    print(f'Neighbor pairs for molecule {mol_id}: {snp_ids}')
+    print(f'Non-paired neighbors are: {exclusive_ids}\n{"-"*40}')
+    time.sleep(1)
+    
+    # -----------------------------
+    # User WANT TO SEE ALL (True), show all unpaired neighbors 
+    if view_unpaired_mols is True: user_select_ids = exclusive_ids
+
+    # User DOESN'T WANT TO SEE ANY (False), show no unpaired neighbors
+    elif view_unpaired_mols is False: user_select_ids = []
+    
+    # User WANT TO A FEW, show the number of unpaired neighbors specified by user
+    elif isinstance(view_unpaired_mols, int): 
+        if view_unpaired_mols < 0:
+            print("Please enter a non-negative integer for the number of unpaired neighbors to view."); return None
+        elif view_unpaired_mols > len(exclusive_ids):
+            print(f"Only {len(exclusive_ids)} unpaired neighbors available. Showing all of them.")
+            user_select_ids = exclusive_ids
+        else:
+            user_select_ids = exclusive_ids[:view_unpaired_mols]
+    
+    # User DOES NOT SPECIFY (None), prompt user which unpaired neighbors to view
+    elif view_unpaired_mols is None: user_select_ids = get_user_input_unpaired(exclusive_ids)
+    
+    # User DOES SPECIFY (list), use their selection of unpaired neighbors
+    else:
+        user_select_ids = view_unpaired_mols
+        # Check if user input is valid
+        if not set(user_select_ids).issubset(set(exclusive_ids)): 
+            print(f"Selected molecule ID not in neighbor list. Please try again."); return None
+    # -----------------------------
+
+    # Verified successful input
+    print(f"You have selected: {user_select_ids}"); time.sleep(1) 
+    
+    # Overall molecule meshes to show
+    meshes_to_show_ids = sorted([mol_id] + snp_ids + user_select_ids)
+    meshes_to_show = [mol_meshes[ids] for ids in meshes_to_show_ids]
+    print(f'{'-'*40}\nYou are now viewing molecules {meshes_to_show_ids}')
+
+    # Line mesh for unblocked neighbors
+    meshes_lines = []
+    target_coord = e_centroids[mol_id]
+    for ids in snp_ids:
+        neighbor_coord = e_centroids[ids]
+        segment = [target_coord, neighbor_coord]
+        cyl = trimesh.creation.cylinder(radius=0.05, segment=segment, sections=24)
+        cyl.visual.face_colors = [255, 255, 0, 100] # Yellow color
+        meshes_lines.append(cyl)
+        
+    # Palette color scheme for higher contrast
+    if distinct_color == True:
+        palette = get_distinct_colors(len(meshes_to_show), alpha=200, method='hsv')
+        for mesh, color in zip(meshes_to_show, palette):
+            num_vertices = len(mesh.vertices)
+            num_faces = len(mesh.faces)
+            mesh.visual.face_colors = np.tile(color, (num_vertices, 1))
+            mesh.visual.face_colors = np.tile(color, (num_faces, 1))
+    
+    meshes = trimesh.util.concatenate(meshes_to_show  + meshes_lines)
+    scene = trimesh.Scene(meshes)
+    
+    return scene.show()
+
+# -----------------------------
+
+# Export wildcard
+__all__ = ['find_neighbor_pairs', 'import_csv', 'view_molecule']
+
+# Check from CLI
+if __name__ == "__main__":
+    print("Running blocking_algo.py as a script")
