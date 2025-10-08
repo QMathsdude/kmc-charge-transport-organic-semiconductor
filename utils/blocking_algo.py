@@ -677,7 +677,7 @@ def view_molecule(mol_id, e_centroids, mol_meshes,
         meshes_lines.append(cyl)
         
     # Palette color scheme for higher contrast
-    if distinct_color == True:
+    if distinct_color is True:
         palette = get_distinct_colors(len(meshes_to_show), alpha=200, method='hsv')
         for mesh, color in zip(meshes_to_show, palette):
             num_vertices = len(mesh.vertices)
