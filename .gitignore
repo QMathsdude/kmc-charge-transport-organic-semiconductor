@@ -100,3 +100,6 @@ env/
 
 # Output Files
 **/animation/
+**/molecule_meshes/
+*.npz
+**/npt-HK4_meshes/

@@ -1,48 +1,49 @@
 """
-This module provides functions for reading and processing GROMACS .gro files,
-which are commonly used in molecular dynamics simulations. The module handles
-file parsing, coordinate extraction, and advanced data processing including
-oxygen midpoint calculations for water molecules.
+This module provides functions for parsing GRO files (GROMACS)
+into suitable pandas DataFrames.
 
-File Format Support:
-- Standard GROMACS .gro format with fixed-width columns
-
-Main Functions:
-- read_gro(): Read .gro file and extract atomic data with metadata
-- dataframe_gro(): Process raw .gro data into structured DataFrame with options
-
-Dependencies:
-- pandas >= 1.3.0
-- numpy >= 1.21.0
-- oxygen_midpoints module (for midpoint calculations)
-
-Note: For oxygen midpoint calculations, the input .gro file must contain
-      O1 and O2 atoms (typically from water molecules) with proper naming.
+Sections:
+----------
+1. Parse GRO files
+    - Main Function:
+        - read_gro(): Parse GRO file into a pandas DataFrame and other useful info.
 """
-
-
 import pandas as pd
 import numpy as np
-from .oxygen_midpoints import compute_midpoints_df_jit
 
-all = ['read_gro']
+# ------------------------------
+# PARSE GRO FILES
+# ------------------------------
 
-# -----------------------------
-
-# Function to extract data from any type of .gro file
-def read_gro(file):
+def read_gro(file, multiply=1, positions=True, velocities=False):
     """
-    Reads a GROMACS .gro file and extracts atomic coordinates.
+    Parse GRO file (GROMACS) into a pandas DataFrame and other useful info.
 
-    Args:
-        file (str): The path to the .gro file.
+    Parameters
+    ----------
+        file: str 
+            PATH to GRO file.
+        multiply : int, optional
+            Factor to multiply units (positions and velocities).
+        positions : bool, optional
+            Include position columns (x, y, z) in the output DataFrame.
+        velocities : bool, optional
+            Include velocity columns (Vx, Vy, Vz) in the output DataFrame.
 
-    Returns:
-        pd.DataFrame: A DataFrame containing all data from .gro file.
+    Returns
+    -------
+        data : pd.DataFrame
+            Multi-index DataFrame.
+        title : str
+            Title line from the GRO file.
+        num_atoms : int
+            Total of atoms (not molecules) in the GRO file.
+        box_dimensions : np.ndarray
+            Array of box dimensions [Lx, Ly, Lz].
     """
-    # Reading Title, number of atoms and box_dimensions
+    # Reading title, number of atoms and box_dimensions
     with open(file, "rb") as f:
-        title = f.readline().decode().strip()  # First line of .gro file
+        title = f.readline().decode().strip()      # First line of .gro file
         num_atoms = f.readline().decode().strip()  # Second line of .gro file
         num_atoms = np.int64(num_atoms) 
 
@@ -78,6 +79,11 @@ def read_gro(file):
         skiprows=2,
         skipfooter=1,
     )
+    
+    # Multiply the units
+    data[['x', 'y', 'z']] *= multiply
+    data[['Vx', 'Vy', 'Vz']] *= multiply
+    box_dimensions *= multiply
 
     # Problem: After atom id 99999, it reverts back to 0. The following solves this:
     overflow_count = num_atoms // 100_000
@@ -88,45 +94,21 @@ def read_gro(file):
         offset_mask = (np.arange(num_atoms) + 1) // 100_000
         data.loc[:,'atom_id'] += offset_mask * 100_000
 
+    # Create multi-index using residue ID and atom name
+    data = data.set_index(['res_id', 'atom_name'])
+    
+    # Choose what data to display
+    if positions is False:
+        data = data.drop(columns=['x', 'y', 'z'])
+    if velocities is False:
+        data = data.drop(columns=['Vx', 'Vy', 'Vz'])
 
     return data, title, num_atoms, box_dimensions
 
 # -----------------------------
 
-# Function that processes the data nicely from a read .gro file
-def dataframe_gro(data, box_length,positions=True, velocities=False, oxygen_midpoints=True):
-    """
-    Process GROMACS .gro data into a structured DataFrame.
-
-    Args:
-        data (pd.DataFrame)               : The input DataFrame containing atomic coordinates.
-        box_length (np.float64)           : The length of the simulation box.
-        positions (bool, optional)        : Whether to include position data. Defaults to True.
-        velocities (bool, optional)       : Whether to include velocity data. Defaults to False.
-        oxygen_midpoints (bool, optional) : Whether to compute oxygen midpoints. Defaults to True.
-
-    Returns:
-        pd.DataFrame: A DataFrame containing the processed GROMACS data.
-    """
-    
-    # Create multi-index using residue ID and atom name
-    df_gro = data.set_index(['res_id', 'atom_name'])
-    
-    # Choose what data to display
-    if positions == False:
-        df_gro = df_gro.drop(columns=['x', 'y', 'z'])
-    if velocities == False:
-        df_gro = df_gro.drop(columns=['Vx', 'Vy', 'Vz'])
-    if oxygen_midpoints == True:
-        midpoints_df = compute_midpoints_df_jit(data, box_length)
-        for idx, row in midpoints_df.iterrows():
-            df_gro.loc[(row['res_id'], slice(None)), 'midO_x'] = row['mid_x']
-            df_gro.loc[(row['res_id'], slice(None)), 'midO_y'] = row['mid_y']
-            df_gro.loc[(row['res_id'], slice(None)), 'midO_z'] = row['mid_z']
-    
-    return df_gro
-
-# -----------------------------
+# Export wildcard
+__all__ = ['read_gro']
 
 # Check from CLI
 if __name__ == "__main__":
