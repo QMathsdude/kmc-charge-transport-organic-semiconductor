@@ -57,7 +57,7 @@ def networkx_graph_making(centroids_path, neighbor_pairs_path, e_coupling_data_p
     delimiter="\t",
     skiprows=1,
     )
-    mol_i, mol_j_nearest, extracted_value, Distance_nm, NN_Distance_nm = zip(*data)
+    mol_i, mol_j_nearest, extracted_value, _, _ = zip(*data)
 
     mol_i = list(map(int,mol_i))
     mol_j_nearest = list(map(int,mol_j_nearest))
@@ -113,15 +113,12 @@ def networkx_graph_making(centroids_path, neighbor_pairs_path, e_coupling_data_p
             if not data:
                 edges_without_attributes.append((u,v))
 
-        print(f"These are the pairs without e_coupling: {edges_without_attributes}")
         molecule_name = centroids_path.rsplit('_', 1)[0]
+        print(f"The pairs without e_coupling has been exported to: {molecule_name}_pairs_without_e_coupling.txt")
         np.savetxt(fname=f"{molecule_name}_pairs_without_e_coupling.txt", X= edges_without_attributes,fmt='%i')  
 
     # add Distance attribute of other edges
     nx.set_edge_attributes(G,pairs_distance)
-
-    print(f"The Graph is: ")
-    print(G.edges(data=True))
 
     # 3D plotting
     if plot_3D_to_gif == True:
