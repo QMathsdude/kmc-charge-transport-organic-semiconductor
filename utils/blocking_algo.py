@@ -270,7 +270,7 @@ def get_neighbor_candidates(box_dimensions, centroids, k=10, threshold_distance=
         neighbor_distances[(i, j)] = dist
 
     # Filter neighbor_candidates where distance < 10 Å
-    neighbor_candidates = [pair for pair, dist in neighbor_distances.items() if dist < 10.0]
+    neighbor_candidates = [pair for pair, dist in neighbor_distances.items() if dist < threshold_distance]
         
     return neighbor_candidates
 
@@ -604,7 +604,8 @@ def get_user_input_unpaired(exclusive_ids):
 def view_molecule(mol_id, e_centroids, mol_meshes, 
                   neighbor_candidates, neighbor_pairs,
                   view_unpaired_mols=None,
-                  distinct_color=False):
+                  distinct_color=False,
+                  alpha_value=255):
     """
     Function to visualize a molecule with its mesh, e-centroid, centroid, and neighbors.
     
@@ -631,6 +632,8 @@ def view_molecule(mol_id, e_centroids, mol_meshes,
             - None, prompt user for input.
     distinct_color: boolean, optional
         If True, use a distinct color scheme for the meshes for higher contrast.
+    alpha_value: int, optional
+        Alpha transparency value for the meshes (0-255). Default is 255 (opaque).
     Returns
     -------
     IPython.core.display.HTML
@@ -695,14 +698,19 @@ def view_molecule(mol_id, e_centroids, mol_meshes,
         
     # Palette color scheme for higher contrast
     if distinct_color is True:
-        palette = get_distinct_colors(len(meshes_to_show), alpha=200, method='hsv')
+        meshes_to_show = [mesh.copy() for mesh in meshes_to_show] # make copy of meshes to color
+        palette = get_distinct_colors(len(meshes_to_show), alpha=alpha_value, method='hsv')
         for mesh, color in zip(meshes_to_show, palette):
             color = np.array(color)
-            color[3] = alpha_value  # enforce alpha
             mesh.visual.face_colors = np.tile(color, (len(mesh.faces), 1))
+    else: # Default color scheme
+        for mesh in meshes_to_show:
+            current_colors = mesh.visual.face_colors.copy()
+            current_colors[:, 3] = alpha_value  # Modify only alpha channel
+            mesh.visual.face_colors = current_colors
 
-    
-    meshes = trimesh.util.concatenate(meshes_to_show  + meshes_lines)
+    # Note: meshes_lines MUST come before meshes_to_show due opacity (z-value)
+    meshes = trimesh.util.concatenate(meshes_lines + meshes_to_show)
     scene = trimesh.Scene(meshes)
     
     return scene.show(viewer='gl')
