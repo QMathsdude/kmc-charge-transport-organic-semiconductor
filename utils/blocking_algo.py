@@ -219,24 +219,28 @@ def compute_centroids_and_radii_pbc(mol_meshes, box_dimensions):
 # 3. NEIGHBOR CANDIDATES
 # ------------------------------
 
-def get_neighbor_candidates(box_dimensions, centroids, k=10):
+def get_neighbor_candidates(box_dimensions, centroids, k=10, threshold_distance=10):
     """
-    Find the k nearest neighbors of each molecule, based on centroid distance.
-    
+    Find the k nearest neighbor candidates for each molecule using KDTree and periodic boundary conditions (PBC),
+    and filter pairs by a maximum centroid-to-centroid distance.
+
     Parameters
     ----------
     box_dimensions : np.ndarray
-        Simulation box_dimensions (Å), shape (3,) for orthorhombic or (3,3) for triclinic
+        Simulation box dimensions (Å), shape (3,) for orthorhombic or (3,3) for triclinic.
     centroids : dict[int, np.ndarray]
         Dictionary where keys are molecule IDs (int) and values are
         the corresponding centroids (numpy arrays of shape (3,)).
     k : int, optional
         Number of nearest neighbors to return per molecule. Default is 10.
+    threshold_distance : float, optional
+        Maximum allowed centroid-to-centroid distance (in Å) for a pair to be considered neighbors.
+        Default is 10.
 
     Returns
     -------
-    dict[int, list[tuple[int,float]]]
-        Mapping mol_id -> list of (neighbor_id, distance).
+    neighbor_candidates : list[tuple[int, int]]
+        List of candidate neighbor pairs (i, j) where i < j and distance < threshold_distance.
     """
 
     ids = list(centroids.keys())
@@ -255,6 +259,18 @@ def get_neighbor_candidates(box_dimensions, centroids, k=10):
                            for key, value in neighbors.items() for t in value if key < t[0]]
     neighbor_candidates = list(set(neighbor_candidates))
     neighbor_candidates.sort()
+
+    # Calculate and store distances between neighbor candidate pairs using centroids
+    neighbor_distances = {}
+
+    for i, j in neighbor_candidates:
+        c_i = centroids[i]
+        c_j = centroids[j]
+        dist = mh.mic_distance(c_i, c_j, box_dimensions)
+        neighbor_distances[(i, j)] = dist
+
+    # Filter neighbor_candidates where distance < 10 Å
+    neighbor_candidates = [pair for pair, dist in neighbor_distances.items() if dist < 10.0]
         
     return neighbor_candidates
 
@@ -527,7 +543,8 @@ def get_distinct_colors(n, alpha=200, method='hsv'):
     alpha: 0-255
     """
     # Invalid number or 0
-    if n <= 0: return []
+    if n <= 0: 
+        return []
     
     # If using matplotlib color scheme
     if method == 'matplotlib_tab':
@@ -673,22 +690,22 @@ def view_molecule(mol_id, e_centroids, mol_meshes,
         neighbor_coord = e_centroids[ids]
         segment = [target_coord, neighbor_coord]
         cyl = trimesh.creation.cylinder(radius=0.05, segment=segment, sections=24)
-        cyl.visual.face_colors = [255, 255, 0, 100] # Yellow color
+        cyl.visual.face_colors = [255, 255, 0, 255] # Yellow color
         meshes_lines.append(cyl)
         
     # Palette color scheme for higher contrast
     if distinct_color is True:
         palette = get_distinct_colors(len(meshes_to_show), alpha=200, method='hsv')
         for mesh, color in zip(meshes_to_show, palette):
-            num_vertices = len(mesh.vertices)
-            num_faces = len(mesh.faces)
-            mesh.visual.face_colors = np.tile(color, (num_vertices, 1))
-            mesh.visual.face_colors = np.tile(color, (num_faces, 1))
+            color = np.array(color)
+            color[3] = alpha_value  # enforce alpha
+            mesh.visual.face_colors = np.tile(color, (len(mesh.faces), 1))
+
     
     meshes = trimesh.util.concatenate(meshes_to_show  + meshes_lines)
     scene = trimesh.Scene(meshes)
     
-    return scene.show()
+    return scene.show(viewer='gl')
 
 # -----------------------------
 
