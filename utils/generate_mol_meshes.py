@@ -132,12 +132,10 @@ def build_molecule_ballstick(coords, elements,
     # --- Process spheres using chunking--- 
     # Base icosphere (unit radius)
     base_sphere = trimesh.creation.icosphere(subdivisions=sphere_subdiv, radius=1.0)
-    # Precompute position, radii and number of vertices for each sphere
-    coords_wrapped = np.mod(coords, box_length)
-    scaled_radii = vdw_r * sphere_radius_scale  
+    coords_wrapped = np.mod(coords, box_length) # Precompute position, radii and number of vertices for each sphere
+    scaled_radii = vdw_r * sphere_radius_scale   
     num_sphere_vertices = len(base_sphere.vertices)
-    # Chunk (pre-allocate) array to hold icosphere object
-    meshes_sphere = np.empty(n, dtype=object)
+    meshes_sphere = np.empty(n, dtype=object) # Chunk (pre-allocate) array to hold icosphere object
     
     for idx, (pos, r) in enumerate(zip(coords_wrapped, scaled_radii)):
         sphere = base_sphere.copy()
@@ -153,9 +151,9 @@ def build_molecule_ballstick(coords, elements,
     base_cyl = trimesh.creation.cylinder(radius=1.0, height=1.0, sections=24)
     num_bond_faces = len(base_cyl.faces)
     bond_color = color_map.get('H') # light grey
-    
     meshes_cylinder = []
-    if n < 1500: # brute force
+    
+    if n < 1500: # brute force is more efficient
         for i in range(n):
             for j in range(i+1, n):
                 d = mh.mic_distance(coords[i], coords[j], box_length)
@@ -166,8 +164,7 @@ def build_molecule_ballstick(coords, elements,
                     pos_i = np.mod(coords[i], box_length)
                     pos_j = pos_i + disp  # may fall outside box but correct bond vector
                     seg = np.vstack((pos_i, pos_j))
-                    cyl = trimesh.creation.cylinder(radius=bond_radius,
-                                                    segment=seg, sections=24)
+                    cyl = trimesh.creation.cylinder(radius=bond_radius, segment=seg, sections=24)
                     cyl.visual.face_colors = np.tile(bond_color, (num_bond_faces, 1))
                     meshes_cylinder.append(cyl)
     else: # k-d tree 
@@ -294,18 +291,18 @@ class Spinner:
     """
     Simple loading bar when tqdm is not appropriate (e.g. single process).
     """
-    def __init__(self, message="Working..."):
+    def __init__(self, message="Working"):
         self._message = message
         self._done = False
         self._thread = threading.Thread(target=self._animate)
 
     def _animate(self):
-        spinner = itertools.cycle(['', '.', '..', '...'])
+        spinner = itertools.cycle(['|', '/', '-', '\\'])
         while not self._done:
             # Use '\r' to return to the start of the line, overwriting previous text
-            sys.stdout.write(f'\r{self._message}{next(spinner)}   ') 
+            sys.stdout.write(f'\r{self._message} {next(spinner)}   ') 
             sys.stdout.flush() 
-            time.sleep(0.5)
+            time.sleep(0.1)
         # Final message to show completion and move to a new line
         sys.stdout.write(f'\rDone: {self._message} complete!   \n')
         sys.stdout.flush()
