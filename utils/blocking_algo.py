@@ -513,11 +513,11 @@ def import_csv(path):
 
 # --------- HELPER FUNCTIONS ---------
     
-def map_symmetric_neighbors(neighbor_candidates, centroids, fill_no_neighbor_mols=False):
+def map_symmetric_neighbors(neighbor_candidates, centroids, mol_with_no_neighbors=True):
     """
     Function to create a symmetric mapping of neighbor candidates.
     Returns a dictionary mapping each molecule ID to a list of its neighbors,
-    e.g. {1:[2,4], 2:[1,4], 3:[], 4:[1,2]}.
+    e.g. {1:[2,4], 2:[1,4], 3:[], 4:[1,2],...}.
     """
     # Create symmetric pairing
     neighbor_map = defaultdict(list)
@@ -526,7 +526,7 @@ def map_symmetric_neighbors(neighbor_candidates, centroids, fill_no_neighbor_mol
         neighbor_map[mol_id_2].append(mol_id_1) # Pass 2
     
     # Molecules with no neighbors are added to dict
-    if fill_no_neighbor_mols is True:
+    if mol_with_no_neighbors is True:
         superset = set(centroids.keys()) # centroids imported just for its keys (mol ID)
         subset = set(neighbor_map.keys())
         no_neighbor_mols = superset - subset
@@ -536,22 +536,14 @@ def map_symmetric_neighbors(neighbor_candidates, centroids, fill_no_neighbor_mol
     neighbor_candidates_symmetric = dict(neighbor_map)
     return neighbor_candidates_symmetric
 
-def get_distinct_colors(n, alpha=200, method='hsv'):
+def get_distinct_colors(n, alpha=200):
     """
     Return a list of n RGBA colors in 0-255 int format.
     method: 'hsv' (even hue spacing) or 'matplotlib_tab' (uses tab20).
     alpha: 0-255
     """
     # Invalid number or 0
-    if n <= 0: 
-        return []
-    
-    # If using matplotlib color scheme
-    if method == 'matplotlib_tab':
-        cmap = get_cmap('tab20') # tab20 has up to 20 distinct categorical colors
-        colors = [cmap(i) for i in range(n)] # cmap returns RGBA floats 0-1
-        colors = [(int(r*255), int(g*255), int(b*255), int(a*255)) for (r,g,b,a) in colors]
-        return colors
+    if n <= 0: return []
     
     # Evenly spaced HSV hues (good for 1 to 11 colors)
     hues = np.linspace(0, 1, n, endpoint=False)
@@ -605,7 +597,7 @@ def view_molecule(mol_id, e_centroids, mol_meshes,
                   neighbor_candidates, neighbor_pairs,
                   view_unpaired_mols=None,
                   distinct_color=False,
-                  alpha_value=255):
+                  alpha=255):
     """
     Function to visualize a molecule with its mesh, e-centroid, centroid, and neighbors.
     
@@ -632,7 +624,7 @@ def view_molecule(mol_id, e_centroids, mol_meshes,
             - None, prompt user for input.
     distinct_color: boolean, optional
         If True, use a distinct color scheme for the meshes for higher contrast.
-    alpha_value: int, optional
+    alpha: int, optional
         Alpha transparency value for the meshes (0-255). Default is 255 (opaque).
     Returns
     -------
@@ -640,8 +632,8 @@ def view_molecule(mol_id, e_centroids, mol_meshes,
         A Trimesh scene object for visualization.
     """
     # Parameters
-    snc = map_symmetric_neighbors(neighbor_candidates, e_centroids, fill_no_neighbor_mols=True)
-    snp = map_symmetric_neighbors(neighbor_pairs, e_centroids, fill_no_neighbor_mols=True)
+    snc = map_symmetric_neighbors(neighbor_candidates, e_centroids, mol_with_no_neighbors=True)
+    snp = map_symmetric_neighbors(neighbor_pairs, e_centroids, mol_with_no_neighbors=True)
     snc_ids, snp_ids = snc[mol_id], snp[mol_id]
     exclusive_ids = sorted(list(set(snc_ids).difference(set(snp_ids))))
     
@@ -693,21 +685,19 @@ def view_molecule(mol_id, e_centroids, mol_meshes,
         neighbor_coord = e_centroids[ids]
         segment = [target_coord, neighbor_coord]
         cyl = trimesh.creation.cylinder(radius=0.05, segment=segment, sections=24)
-        cyl.visual.face_colors = [255, 255, 0, 255] # Yellow color
+        cyl.visual.face_colors = [0, 0, 0, 255] # Black color
         meshes_lines.append(cyl)
         
     # Palette color scheme for higher contrast
     if distinct_color is True:
         meshes_to_show = [mesh.copy() for mesh in meshes_to_show] # make copy of meshes to color
-        palette = get_distinct_colors(len(meshes_to_show), alpha=alpha_value, method='hsv')
+        palette = get_distinct_colors(len(meshes_to_show), alpha=alpha)
         for mesh, color in zip(meshes_to_show, palette):
             color = np.array(color)
             mesh.visual.face_colors = np.tile(color, (len(mesh.faces), 1))
     else: # Default color scheme
         for mesh in meshes_to_show:
-            current_colors = mesh.visual.face_colors.copy()
-            current_colors[:, 3] = alpha_value  # Modify only alpha channel
-            mesh.visual.face_colors = current_colors
+            mesh.visual.face_colors[:, 3] = alpha  # Modify only alpha channel
 
     # Note: meshes_lines MUST come before meshes_to_show due opacity (z-value)
     meshes = trimesh.util.concatenate(meshes_lines + meshes_to_show)
