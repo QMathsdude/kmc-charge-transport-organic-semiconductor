@@ -17,6 +17,7 @@ Python dependencies for this project are listed in the `environment.yml` file. T
 The only folders that are relevant to the final program are:
 - `completed` — Holds the main file (`main_pipeline.ipynb`)
 - `utils` — All packages for this project
+- `data` — All molecule datas
 
 Every other folders are not used in the final program, and can be considered _prototypes_ which catalog this project's development process. 
 
