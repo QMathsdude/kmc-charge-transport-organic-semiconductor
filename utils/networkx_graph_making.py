@@ -23,7 +23,7 @@ from . import mic_helper as mh
 # MAKE NETWORKX GRAPH
 # ------------------------------
 
-def networkx_graph_making(centroids_path, neighbor_pairs_path, e_coupling_data_path, pairs_without_e_coupling_to_txt = True, plot_3D_to_gif = False, print_result = False):
+def networkx_graph_making(centroids_path, neighbor_pairs_path, e_coupling_data_path, pairs_without_e_coupling_to_txt = True, plot_3D_to_gif = False):
     """
     Returns networkx_graph object, with option to show pairs without e_coupling data and option to plot in 3D.
 
@@ -121,7 +121,7 @@ def networkx_graph_making(centroids_path, neighbor_pairs_path, e_coupling_data_p
     nx.set_edge_attributes(G,pairs_distance)
 
     # 3D plotting
-    if plot_3D_to_gif == True:
+    if plot_3D_to_gif is True:
         edges_arr = np.empty(shape=(pairs.shape[0],2,3))
         numerator = 0
         for (p,q) in pairs:
