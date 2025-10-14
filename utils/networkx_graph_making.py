@@ -23,7 +23,7 @@ from . import mic_helper as mh
 # MAKE NETWORKX GRAPH
 # ------------------------------
 
-def networkx_graph_making(centroids_path, neighbor_pairs_path, e_coupling_data_path, pairs_without_e_coupling_to_txt = True, plot_3D_to_gif = False):
+def networkx_graph_making(centroids_path, neighbor_pairs_path, e_coupling_data_path, pairs_without_e_coupling_to_txt = True, plot_3D_to_gif = False, print_result = False):
     """
     Returns networkx_graph object, with option to show pairs without e_coupling data and option to plot in 3D.
 
